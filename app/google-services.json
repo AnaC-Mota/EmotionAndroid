@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "217645884982",
+    "project_id": "emocoes-4f9b5",
+    "storage_bucket": "emocoes-4f9b5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:217645884982:android:9aeabbd5daaa82c4061a97",
+        "android_client_info": {
+          "package_name": "pt.ipmaia.cm2024.appmultiecra"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCAXFMo8KlflPJUch4m_Mx7d0Gbu40ekik"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

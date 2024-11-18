@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">AppMultiEcra</string>
+    <string name="ecra01">ecra01</string>
+    <string name="ecra02">ecra02</string>
+    <string name="ecra03">ecra03</string>
+    <string name="ecra04">ecra04</string>
+</resources>
