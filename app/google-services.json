@@ -12,7 +12,20 @@
           "package_name": "pt.ipmaia.cm2024.appmultiecra"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "217645884982-n18jp2ag1hdf7vcb9586pv43h69e6lko.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "pt.ipmaia.cm2024.appmultiecra",
+            "certificate_hash": "109d25c02e312dfcfabf67bc9aa82bb7fe9e487c"
+          }
+        },
+        {
+          "client_id": "217645884982-0g4rb4bqnb19mg8t9ad8kqgu1ohatb6s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCAXFMo8KlflPJUch4m_Mx7d0Gbu40ekik"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "217645884982-0g4rb4bqnb19mg8t9ad8kqgu1ohatb6s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

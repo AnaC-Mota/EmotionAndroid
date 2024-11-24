@@ -3,12 +3,18 @@ package pt.ipmaia.cm2024.appmultiecra
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
 import pt.ipmaia.cm2024.appmultiecra.ui.theme.AppMultiEcraTheme
@@ -26,25 +32,32 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgramaPrincipal() {
     val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
 
-    // Inicializa o estado com o valor atual do usuário
-    var isLoggedIn by remember { mutableStateOf(auth.currentUser != null) }
+    // Estado de login que observa alterações no usuário autenticado
+    var currentUser by remember { mutableStateOf(auth.currentUser) }
 
-    // Detecta alterações no estado de autenticação de forma assíncrona
-    LaunchedEffect(Unit) {
-        auth.addAuthStateListener { firebaseAuth ->
-            isLoggedIn = firebaseAuth.currentUser != null
+    // Listener para atualizações de autenticação
+    DisposableEffect(auth) {
+        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            currentUser = firebaseAuth.currentUser
+        }
+        auth.addAuthStateListener(listener)
+
+        // Remove o listener ao sair do Composable
+        onDispose {
+            auth.removeAuthStateListener(listener)
         }
     }
 
-    // Realiza a navegação inicial com base no estado de login
-    LaunchedEffect(isLoggedIn) {
-        if (isLoggedIn) {
-            navController.navigate(Destino.Login.route) {
+    // Realiza a navegação com base no estado de login
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            navController.navigate(Destino.Ecra01.route) {
                 popUpTo(0) // Limpa a pilha de navegação
             }
         } else {
@@ -55,8 +68,31 @@ fun ProgramaPrincipal() {
     }
 
     Scaffold(
+        topBar ={
+            TopAppBar(title = {
+                Text("Emotions")
+            }, actions = {
+                Row(
+                    Modifier.padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (currentUser != null) {
+                        Button(onClick = {
+                            auth.signOut()
+                            currentUser = null
+                            navController.navigate(Destino.Login.route) {
+                                popUpTo(0)
+                            }
+                        }) {
+                            Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
+                        }
+                    }
+
+                }
+            })
+        },
         bottomBar = {
-            if (isLoggedIn) {
+            if (currentUser != null) {
                 BottomNavigationBar(navController = navController, appItems = Destino.toList)
             }
         },

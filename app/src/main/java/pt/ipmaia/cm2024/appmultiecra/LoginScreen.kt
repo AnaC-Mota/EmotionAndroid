@@ -1,6 +1,7 @@
 package pt.ipmaia.cm2024.appmultiecra.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -8,20 +9,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.google.firebase.auth.FirebaseAuth
 import pt.ipmaia.cm2024.appmultiecra.Destino
+import pt.ipmaia.cm2024.appmultiecra.R
 
 @Composable
 fun LoginScreen(navController: NavHostController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var isLoginMode by remember { mutableStateOf(true) }  // Controle de modo (login ou cadastro)
-
+    var isLoginMode by remember { mutableStateOf(true) }
+    var isLoading by remember { mutableStateOf(false) }
     val auth = FirebaseAuth.getInstance()
 
     Column(
@@ -31,6 +34,14 @@ fun LoginScreen(navController: NavHostController) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Image(
+            painter = painterResource(id = R.drawable.loo), // Substitua "logo" pelo nome do arquivo da sua imagem
+            contentDescription = "Logo do App",
+            modifier = Modifier
+                .size(200.dp) // Define o tamanho da imagem
+                .padding(top = 40.dp, bottom = 16.dp)
+        )
+
         if (isLoginMode) {
             // Tela de Login
             LoginForm(
@@ -40,10 +51,13 @@ fun LoginScreen(navController: NavHostController) {
                 onPasswordChange = { password = it },
                 onLoginClick = {
                     if (email.isNotEmpty() && password.isNotEmpty()) {
+                        isLoading = true
                         auth.signInWithEmailAndPassword(email, password)
                             .addOnCompleteListener { task ->
+                                isLoading = false
                                 if (task.isSuccessful) {
-                                    navController.navigate(Destino.Ecra01.route)  // Navega para a tela principal após login
+                                    navController.popBackStack()
+                                    navController.navigate(Destino.Ecra01.route)
                                 } else {
                                     Toast.makeText(navController.context, "Falha no login: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                                 }
@@ -52,7 +66,7 @@ fun LoginScreen(navController: NavHostController) {
                         Toast.makeText(navController.context, "Por favor, preencha todos os campos", Toast.LENGTH_SHORT).show()
                     }
                 },
-                onSwitchToCadastroClick = { isLoginMode = false }  // Alterna para o cadastro
+                onSwitchToCadastroClick = { isLoginMode = false }
             )
         } else {
             // Tela de Cadastro
@@ -65,10 +79,12 @@ fun LoginScreen(navController: NavHostController) {
                 onConfirmPasswordChange = { confirmPassword = it },
                 onCadastroClick = {
                     if (email.isNotEmpty() && password == confirmPassword) {
+                        isLoading = true
                         auth.createUserWithEmailAndPassword(email, password)
                             .addOnCompleteListener { task ->
+                                isLoading = false
                                 if (task.isSuccessful) {
-                                    navController.navigate(Destino.Login.route)  // Volta para o login após cadastro
+                                    navController.navigate(Destino.Login.route)
                                 } else {
                                     Toast.makeText(navController.context, "Falha no cadastro: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                                 }
@@ -77,8 +93,12 @@ fun LoginScreen(navController: NavHostController) {
                         Toast.makeText(navController.context, "Por favor, preencha todos os campos corretamente", Toast.LENGTH_SHORT).show()
                     }
                 },
-                onSwitchToLoginClick = { isLoginMode = true }  // Alterna para o login
+                onSwitchToLoginClick = { isLoginMode = true }
             )
+        }
+
+        if (isLoading) {
+            CircularProgressIndicator(modifier = Modifier.padding(16.dp))
         }
     }
 }
