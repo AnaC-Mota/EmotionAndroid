@@ -1,5 +1,6 @@
 package pt.ipmaia.cm2024.appmultiecra
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,8 +11,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.BottomNavigation
 import androidx.compose.material.BottomNavigationItem
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,14 +33,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.getValue
 import pt.ipmaia.cm2024.appmultiecra.ui.screens.LoginScreen
-
-
-import pt.ipmaia.cm2024.appmultiecra.ui.screens.LoginScreen  // Importa a tela de login
 
 @Composable
 fun AppNavigation(navController: NavHostController) {
@@ -233,111 +234,102 @@ fun Ecra01( registros: MutableList<String>, navController: NavController,modifie
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = {
             if (title.isNotEmpty() && emotion.isNotEmpty()) {
-                val registro = "$selectedEmoji - Título: $title - Emoção: $emotion - Descrição: $description"
-                registros.add(registro)
-                selectedEmoji = ""
-                title = ""
-                emotion = ""
-                description = ""
-                navController.navigate(Destino.Ecra02.route)
+                val userId = FirebaseAuth.getInstance().currentUser?.uid
+                if (userId != null) {
+                    val registro = mapOf(
+                        "emoji" to selectedEmoji,
+                        "title" to title,
+                        "emotion" to emotion,
+                        "description" to description
+                    )
+                    val database = FirebaseDatabase.getInstance()
+                    val registroRef = database.getReference("registros/$userId").push()
+                    registroRef.setValue(registro).addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            selectedEmoji = ""
+                            title = ""
+                            emotion = ""
+                            description = ""
+                            navController.navigate(Destino.Ecra02.route)
+                        } else {
+                            Log.e("FirebaseError", "Erro ao salvar o registro", task.exception)
+                        }
+                    }
+                } else {
+                    Log.e("AuthError", "Usuário não autenticado")
+                }
             }
         }) {
             Text("Salvar")
         }
-
     }
 }
 
 
 @Composable
 fun Ecra02(registros: List<String>, navController: NavController, modifier: Modifier = Modifier) {
-    // Container para a barra de pesquisa e os registros
-    Column(modifier = modifier.fillMaxSize()) {
-        // Barra de pesquisa
-        Row(
-            modifier = Modifier
-                .clip(CircleShape)
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(16.dp)
-        ) {
-            Icon(Icons.Default.Search, contentDescription = null, tint = Color.White)
-            Spacer(Modifier.size(7.dp))
-            Text(
-                "Pesquisa...",
-                color = Color.White,
-                fontSize = 18.sp // Aumentando o tamanho da fonte da pesquisa
-            )
+    val registros = remember { mutableStateListOf<Map<String, String>>() }
+    val userId = FirebaseAuth.getInstance().currentUser?.uid
+
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            val database = FirebaseDatabase.getInstance()
+            val registroRef = database.getReference("registros/$userId")
+
+            registroRef.addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    registros.clear() // Limpar registros anteriores
+                    for (child in snapshot.children) {
+                        val registro = child.getValue<Map<String, String>>()
+                        if (registro != null) {
+                            registros.add(registro)
+                        }
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("FirebaseError", "Erro ao carregar registros", error.toException())
+                }
+            })
         }
+    }
 
-        // Espaçamento entre a barra de pesquisa e a lista de registros
-        Spacer(modifier = Modifier.height(8.dp))
+    // Layout da tela com a lista de registros
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(10.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        items(registros) { registro ->
+            val emoji = registro["emoji"] ?: ""
+            val title = registro["title"] ?: ""
 
-        // Exibição dos registros
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(10.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp) // Aumenta o espaçamento entre os registros
-        ) {
-            items(registros) { registro ->
-                // Divide o registro para obter o emoji e o título
-                val details = registro.split(" - ")
-                val emoji = details[0]
-                val title = details.getOrNull(1)?.substringAfter("Título: ")?.trim() ?: ""
-
-                // Row com alinhamento dos itens
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp) // Aumenta o espaçamento interno
-                        .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(10.dp))
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.Start // Garante que o conteúdo do Row seja alinhado à esquerda
-                ) {
-                    // Exibe texto (título) à esquerda
-                    Column(
-                        modifier = Modifier.weight(0.3f)  // Deixa o texto ocupar mais espaço
-                    ) {
-                        Text(
-                            text = emoji,
-                            fontSize = 29.sp, // Aumenta o tamanho do emoji
-                            modifier = Modifier.align(Alignment.Start) // Alinha o emoji à direita
-                        )
-                        Spacer(modifier = Modifier.height(8.dp)) // Espaço entre texto e emoji
-                    }
-
-                    // Exibe emoji à direita
-                    Column(
-                        modifier = Modifier.weight(1f)  // Deixa o emoji menor
-                    ) {
-                        Text(
-                            text = title,
-                            fontSize = 16.sp, // Aumenta o tamanho do título
-                            fontWeight = FontWeight.Bold, // Deixa o título em negrito
-                            modifier = Modifier.align(Alignment.Start) // Alinha o título à esquerda
-
-                        )
-                    }
-
-                    // Botão "Detalhes" alinhado à direita
-                    Button(
-                        onClick = {
-                            // Navegar para a tela de detalhes passando o registro completo
-                            navController.navigate("detalhes_screen/$registro")
-                        },
-                        modifier = Modifier.align(Alignment.CenterVertically) // Alinha o botão verticalmente
-                    ) {
-                        Text("Detalhes")
-                    }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp)
+                    .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(10.dp))
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                Text(text = emoji, fontSize = 29.sp)
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Button(onClick = {
+                    val registroCompleto = "$emoji - Título: ${registro["title"]} - Emoção: ${registro["emotion"]} - Descrição: ${registro["description"]}"
+                    navController.navigate("detalhes_screen/$registroCompleto")
+                }) {
+                    Text("Detalhes")
                 }
             }
         }
     }
 }
-
-
-
-
 
 
 
