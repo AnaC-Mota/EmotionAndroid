@@ -61,7 +61,7 @@ fun ProgramaPrincipal() {
     // Realiza a navegação com base no estado de login
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
-            navController.navigate(Destino.Ecra01.route) {
+            navController.navigate(Destino.Dashboard.route) {
                 popUpTo(0) // Limpa a pilha de navegação
             }
         } else {

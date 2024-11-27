@@ -48,9 +48,12 @@ import pt.ipmaia.cm2024.appmultiecra.ui.screens.LoginScreen
 fun AppNavigation(navController: NavHostController) {
     val registros = remember { mutableStateListOf<String>() }
 
-    NavHost(navController, startDestination = Destino.Login.route) {  // Inicia com a tela de login
+    NavHost(navController, startDestination = Destino.Login.route) {
         composable(Destino.Login.route) {
-            LoginScreen(navController = navController)  // Tela de login/cadastro
+            LoginScreen(navController = navController)
+        }
+        composable(Destino.Dashboard.route) {
+            Dashboard(registros = registros, navController = navController)
         }
         composable(Destino.Ecra01.route) {
             Ecra01(registros = registros, navController = navController)
@@ -67,6 +70,7 @@ fun AppNavigation(navController: NavHostController) {
         }
     }
 }
+
 
 
 
@@ -94,6 +98,49 @@ fun BottomNavigationBar(navController: NavController, appItems: List<Destino>) {
         }
     }
 }
+
+@Composable
+fun Dashboard (registros: MutableList<String>, navController: NavController,modifier: Modifier = Modifier){
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "👋 Bem-vindo!",
+            style = MaterialTheme.typography.headlineLarge.copy(fontSize = 36.sp),
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(70.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Dados do seu dashboard",
+                style = MaterialTheme.typography.headlineSmall.copy(fontSize = 20.sp),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+        }
+    }
+}
+
 
 @Composable
 fun Ecra01( registros: MutableList<String>, navController: NavController,modifier: Modifier = Modifier) {
