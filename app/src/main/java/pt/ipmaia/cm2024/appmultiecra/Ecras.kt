@@ -43,6 +43,8 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.getValue
 import pt.ipmaia.cm2024.appmultiecra.ui.screens.LoginScreen
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun AppNavigation(navController: NavHostController) {
@@ -53,7 +55,7 @@ fun AppNavigation(navController: NavHostController) {
             LoginScreen(navController = navController)
         }
         composable(Destino.Dashboard.route) {
-            Dashboard(registros = registros, navController = navController)
+            Dashboard(navController = navController)
         }
         composable(Destino.Ecra01.route) {
             Ecra01(registros = registros, navController = navController)
@@ -71,10 +73,6 @@ fun AppNavigation(navController: NavHostController) {
     }
 }
 
-
-
-
-
 @Composable
 fun BottomNavigationBar(navController: NavController, appItems: List<Destino>) {
     BottomNavigation(
@@ -87,11 +85,12 @@ fun BottomNavigationBar(navController: NavController, appItems: List<Destino>) {
                 label = { Text(text = item.title) },
                 selected = false,
                 onClick = {
-                    navController.navigate(item.route){
-                        navController.graph.startDestinationRoute?.let{route -> popUpTo(route) {saveState = true}
+                    navController.navigate(item.route) {
+                        navController.graph.startDestinationRoute?.let { route ->
+                            popUpTo(route) { saveState = true }
                         }
-                    launchSingleTop = true
-                    restoreState = true
+                        launchSingleTop = true
+                        restoreState = true
                     }
                 }
             )
@@ -100,9 +99,45 @@ fun BottomNavigationBar(navController: NavController, appItems: List<Destino>) {
 }
 
 @Composable
-fun Dashboard (registros: MutableList<String>, navController: NavController,modifier: Modifier = Modifier){
+fun Dashboard(navController: NavController) {
+    val userId = FirebaseAuth.getInstance().currentUser?.uid
+    val registros = remember { mutableStateListOf<String>() }
+    val daysStatus = remember { mutableStateListOf(false, false, false, false, false, false, false) }
+
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            val database = FirebaseDatabase.getInstance()
+            val registroRef = database.getReference("registros/$userId")
+
+            registroRef.addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    registros.clear()
+                    daysStatus.fill(false)
+
+                    for (child in snapshot.children) {
+                        val registro = child.child("date").value?.toString()
+                        if (registro != null ) {
+                            registros.add(registro)
+
+                            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                            val date = LocalDate.parse(registro, formatter)
+                            val dayOfWeek = date.dayOfWeek.value % 7 // Mapear para 0 (Domingo) a 6 (Sábado)
+
+                            daysStatus[dayOfWeek] = true
+                        }
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e("FirebaseError", "Erro ao carregar registros", error.toException())
+                }
+            })
+        }
+    }
+
+
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.Top,
@@ -113,30 +148,67 @@ fun Dashboard (registros: MutableList<String>, navController: NavController,modi
             style = MaterialTheme.typography.headlineLarge.copy(fontSize = 36.sp),
             color = MaterialTheme.colorScheme.primary
         )
-    }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(70.dp),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(
+        Spacer(modifier = Modifier.height(50.dp))
+
+        // Card de Frequência de Registros
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(10.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(8.dp)
         ) {
-            Text(
-                text = "Dados do seu dashboard",
-                style = MaterialTheme.typography.headlineSmall.copy(fontSize = 20.sp),
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "📅 Frequência de Registros",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = MaterialTheme.colorScheme.secondary
+                )
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Linha de ícones de dias da semana
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    val days = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
+                    days.forEachIndexed { index, day ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                painter = painterResource(
+                                    id = if (daysStatus[index]) R.drawable.ic_filled_circle else R.drawable.ic_empty_circle
+                                ),
+                                contentDescription = day,
+                                modifier = Modifier.size(40.dp),
+                                tint = if (daysStatus[index])  MaterialTheme.colorScheme.primary else Color.Gray
+                            )
+                            Text(
+                                text = day,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(30.dp))
+
+                // Botão dentro do Card
+                Button(onClick = { navController.navigate(Destino.Ecra01.route) }) {
+                    Text("Adicionar Registro")
+                }
+            }
         }
     }
 }
@@ -287,7 +359,8 @@ fun Ecra01( registros: MutableList<String>, navController: NavController,modifie
                         "emoji" to selectedEmoji,
                         "title" to title,
                         "emotion" to emotion,
-                        "description" to description
+                        "description" to description,
+                        "date" to LocalDate.now().toString()
                     )
                     val database = FirebaseDatabase.getInstance()
                     val registroRef = database.getReference("registros/$userId").push()
