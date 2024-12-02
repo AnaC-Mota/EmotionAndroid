@@ -42,31 +42,27 @@ fun ProgramaPrincipal() {
     val navController = rememberNavController()
     val auth = FirebaseAuth.getInstance()
 
-    // Estado de login que observa alterações no usuário autenticado
     var currentUser by remember { mutableStateOf(auth.currentUser) }
 
-    // Listener para atualizações de autenticação
     DisposableEffect(auth) {
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             currentUser = firebaseAuth.currentUser
         }
         auth.addAuthStateListener(listener)
 
-        // Remove o listener ao sair do Composable
         onDispose {
             auth.removeAuthStateListener(listener)
         }
     }
 
-    // Realiza a navegação com base no estado de login
     LaunchedEffect(currentUser) {
         if (currentUser != null) {
             navController.navigate(Destino.Dashboard.route) {
-                popUpTo(0) // Limpa a pilha de navegação
+                popUpTo(0)
             }
         } else {
             navController.navigate(Destino.Login.route) {
-                popUpTo(0) // Limpa a pilha de navegação
+                popUpTo(0)
             }
         }
     }

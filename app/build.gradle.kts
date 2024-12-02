@@ -79,4 +79,8 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
     implementation(platform("com.google.firebase:firebase-bom:32.8.0"))
     implementation("com.google.firebase:firebase-database")
+    implementation ("androidx.webkit:webkit:1.8.0")
+    implementation ("com.google.code.gson:gson:2.8.9")
+
+
 }
