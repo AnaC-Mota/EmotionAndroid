@@ -48,7 +48,13 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.text.TextStyle
 import com.google.gson.Gson
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class EmotionData(val Emocao: String, val Quantidade: Int)
 
@@ -108,7 +114,7 @@ fun BottomNavigationBar(navController: NavController, appItems: List<Destino>) {
 fun Dashboard(navController: NavController) {
     val userId = FirebaseAuth.getInstance().currentUser?.uid
     val registros = remember { mutableStateListOf<String>() }
-    val daysStatus = remember { mutableStateListOf(false, false, false, false, false, false, false) }
+    val daysStatus = remember { mutableStateMapOf<String, Boolean>() } // Usar o dia completo como chave (DD/MM)
     val emocaoCount = remember { mutableStateMapOf<String, Int>() } // Contador de emoções
 
     LaunchedEffect(userId) {
@@ -118,11 +124,10 @@ fun Dashboard(navController: NavController) {
 
             Log.d("FirebaseSetup", "Listener configurado para userId: $userId")
 
-
             registroRef.addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     registros.clear()
-                    daysStatus.fill(false)
+                    daysStatus.clear()
                     emocaoCount.clear()
 
                     for (child in snapshot.children) {
@@ -130,22 +135,20 @@ fun Dashboard(navController: NavController) {
                         val emotion = child.child("emotion").value?.toString()
                         Log.d("FirebaseData", "Emotion: $emotion")
 
-
-                        if (registro != null ) {
+                        if (registro != null) {
                             registros.add(registro)
 
                             val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
                             val date = LocalDate.parse(registro, formatter)
-                            val dayOfWeek = date.dayOfWeek.value % 7 // Mapear para 0 (Domingo) a 6 (Sábado)
+                            val formattedDate = date.format(DateTimeFormatter.ofPattern("dd/MM")) // Formato para data (DD/MM)
 
-                            daysStatus[dayOfWeek] = true
+                            daysStatus[formattedDate] = true
                         }
                         if (emotion != null) {
                             emocaoCount[emotion] = (emocaoCount[emotion] ?: 0) + 1
                         }
                     }
                     Log.d("FirebaseData", "Emotion Count: $emocaoCount") // Verifique o resultado final
-
                 }
 
                 override fun onCancelled(error: DatabaseError) {
@@ -155,6 +158,10 @@ fun Dashboard(navController: NavController) {
         }
     }
 
+    // Gerar todos os dias do ano (2024 como exemplo)
+    val daysOfLastYear = List(365) { index ->
+        LocalDate.now().minusDays(index.toLong()).format(DateTimeFormatter.ofPattern("dd/MM"))
+    }.toList()
 
     Column(
         modifier = Modifier
@@ -196,20 +203,21 @@ fun Dashboard(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
+                // Adiciona o LazyRow para rolar todos os dias do ano
+                LazyRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            reverseLayout = true
                 ) {
-                    val days = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
-                    days.forEachIndexed { index, day ->
+                    itemsIndexed(daysOfLastYear) { index, day ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 painter = painterResource(
-                                    id = if (daysStatus[index]) R.drawable.ic_filled_circle else R.drawable.ic_empty_circle
+                                    id = if (daysStatus[day] == true) R.drawable.ic_filled_circle else R.drawable.ic_empty_circle
                                 ),
                                 contentDescription = day,
                                 modifier = Modifier.size(40.dp),
-                                tint = if (daysStatus[index])  MaterialTheme.colorScheme.primary else Color.Gray
+                                tint = if (daysStatus[day] == true) MaterialTheme.colorScheme.primary else Color.Gray
                             )
                             Text(
                                 text = day,
@@ -227,7 +235,6 @@ fun Dashboard(navController: NavController) {
                 }
             }
         }
-
         Spacer(modifier = Modifier.height(20.dp))
 
         Text(
@@ -441,20 +448,41 @@ fun Ecra02(registros: List<String>, navController: NavController, modifier: Modi
     val registros = remember { mutableStateListOf<Map<String, String>>() }
     val userId = FirebaseAuth.getInstance().currentUser?.uid
 
-    LaunchedEffect(userId) {
+    // Estados para o filtro e o dropdown
+    var orderBy by remember { mutableStateOf("Filtros") } // Texto padrão do botão
+    var dropdownExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(userId, orderBy) {
         if (userId != null) {
             val database = FirebaseDatabase.getInstance()
             val registroRef = database.getReference("registros/$userId")
 
             registroRef.addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
-                    registros.clear() // Limpar registros anteriores
+                    val tempList = mutableListOf<Map<String, String>>()
+
                     for (child in snapshot.children) {
                         val registro = child.getValue<Map<String, String>>()
                         if (registro != null) {
-                            registros.add(registro)
+                            tempList.add(registro)
                         }
                     }
+
+                    // Ordenar com base na data
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                    tempList.sortWith { a, b ->
+                        val dateA = a["date"]?.let { parseDate(it, dateFormat) }
+                        val dateB = b["date"]?.let { parseDate(it, dateFormat) }
+
+                        when (orderBy) {
+                            "Mais Recentes" -> (dateB ?: Date()).compareTo(dateA ?: Date())
+                            "Mais Antigos" -> (dateA ?: Date()).compareTo(dateB ?: Date())
+                            else -> 0
+                        }
+                    }
+
+                    registros.clear()
+                    registros.addAll(tempList)
                 }
 
                 override fun onCancelled(error: DatabaseError) {
@@ -464,56 +492,119 @@ fun Ecra02(registros: List<String>, navController: NavController, modifier: Modi
         }
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(10.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
+    Column(
+        modifier = Modifier.fillMaxSize()
     ) {
-        items(registros) { registro ->
-            val emoji = registro["emoji"] ?: ""
-            val title = registro["title"] ?: ""
-
-            Row(
+        // Dropdown Menu para filtro
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            contentAlignment = Alignment.TopStart // Posiciona no topo esquerdo
+        ) {
+            Button(onClick = { dropdownExpanded = !dropdownExpanded }) {
+                Text(orderBy)
+            }
+            DropdownMenu(
+                expanded = dropdownExpanded,
+                onDismissRequest = { dropdownExpanded = false },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp)
-                    .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(10.dp))
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.Start
+                    .wrapContentWidth()
+                    .offset(y = 10.dp) // Move o menu para logo abaixo do botão
             ) {
-                Text(text = emoji, fontSize = 29.sp)
-                Spacer(modifier = Modifier.width(16.dp))
-                Text(
-                    text = title,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                DropdownMenuItem(
+                    text = { Text("Mais Recentes") },
+                    onClick = {
+                        orderBy = "Mais Recentes"
+                        dropdownExpanded = false
+                    }
                 )
-                Spacer(modifier = Modifier.weight(1f))
-                Button(onClick = {
-                    val registroCompleto = "$emoji - Título: ${registro["title"]} - Emoção: ${registro["emotion"]} - Descrição: ${registro["description"]}"
-                    navController.navigate("detalhes_screen/$registroCompleto")
-                }) {
-                    Text("Detalhes")
+                DropdownMenuItem(
+                    text = { Text("Mais Antigos") },
+                    onClick = {
+                        orderBy = "Mais Antigos"
+                        dropdownExpanded = false
+                    }
+                )
+            }
+        }
+
+        // Lista de registros
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(10.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            items(registros) { registro ->
+                val emoji = registro["emoji"] ?: ""
+                val title = registro["title"] ?: ""
+                val date = registro["date"] ?: "Data não disponível"
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp)
+                        .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(10.dp))
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    Text(text = emoji, fontSize = 29.sp)
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = title,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = date,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Button(onClick = {
+                        val registroCompleto = "$emoji - Título: ${registro["title"]} - Emoção: ${registro["emotion"]} - Descrição: ${registro["description"]} - Data: $date"
+                        navController.navigate("detalhes_screen/$registroCompleto")
+                    }) {
+                        Text("Detalhes")
+                    }
                 }
             }
         }
     }
 }
 
-
+// Função auxiliar para converter string em Date
+fun parseDate(dateString: String, dateFormat: SimpleDateFormat): Date? {
+    return try {
+        dateFormat.parse(dateString)
+    } catch (e: Exception) {
+        null
+    }
+}
 
 @Composable
 fun EcraDetalhes(registro: String, modifier: Modifier = Modifier) {
     val details = registro.split(" - ")
 
-    if (details.size >= 4) {
+    // Verifica se há pelo menos 5 elementos, já que estamos incluindo a data
+    if (details.size >= 5) {
         val emoji = details[0]
         val title = details[1].substringAfter("Título: ").trim()
         val emotion = details[2].substringAfter("Emoção: ").trim()
         val description = details[3].substringAfter("Descrição: ").trim()
+        val date = details[4].substringAfter("Data: ").trim()
 
-        Column(modifier = modifier.fillMaxSize().padding(20.dp)) {
-            Text(text = "Detalhes do Registro", style = MaterialTheme.typography.headlineMedium)
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(20.dp)
+        ) {
+            Text(
+                text = "Detalhes do Registro",
+                style = MaterialTheme.typography.headlineMedium
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -534,18 +625,32 @@ fun EcraDetalhes(registro: String, modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(8.dp))
 
             // Emotion
-            Text(text = "Emoção: $emotion",
+            Text(
+                text = "Emoção: $emotion",
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 20.sp)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             // Description
-            Text(text = "Descrição: $description",
+            Text(
+                text = "Descrição: $description",
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 20.sp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Date
+            Text(
+                text = "Data: $date",
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 20.sp)
             )
         }
     } else {
-        Text("Registro inválido.", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = "Registro inválido.",
+            style = MaterialTheme.typography.bodyLarge
+        )
     }
 }
+
